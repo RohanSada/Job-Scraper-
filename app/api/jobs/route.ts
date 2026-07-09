@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { lastRefreshedAt, listSources, queryJobs, type JobFilters } from "@/lib/db";
+import {
+  lastRefreshedAt,
+  lastRefreshStartedAt,
+  listSources,
+  queryJobs,
+  type JobFilters,
+} from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +34,7 @@ export async function GET(req: Request) {
     jobs,
     sources: listSources(),
     lastRefreshedAt: lastRefreshedAt(),
+    refreshStartedAt: lastRefreshStartedAt(),
     count: jobs.length,
   });
 }

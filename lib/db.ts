@@ -48,6 +48,11 @@ function init(): Database.Database {
 
     CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source_id);
     CREATE INDEX IF NOT EXISTS idx_jobs_active ON jobs(is_active);
+
+    CREATE TABLE IF NOT EXISTS meta (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
   `);
 
   return database;
@@ -262,10 +267,49 @@ export function queryJobs(filters: JobFilters): JobWithSource[] {
   return getDb().prepare(sql).all(...params) as JobWithSource[];
 }
 
-/** Most recent refresh timestamp across all sources. */
+/** Most recent refresh completion timestamp across all sources (for display). */
 export function lastRefreshedAt(): string | null {
   const row = getDb()
     .prepare("SELECT MAX(last_fetched_at) AS ts FROM sources")
     .get() as { ts: string | null };
   return row?.ts ?? null;
+}
+
+// ---------- Meta / refresh tracking ----------
+
+function setMeta(key: string, value: string): void {
+  getDb()
+    .prepare(
+      `INSERT INTO meta (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    )
+    .run(key, value);
+}
+
+function getMeta(key: string): string | null {
+  const row = getDb().prepare("SELECT value FROM meta WHERE key = ?").get(key) as
+    | { value: string }
+    | undefined;
+  return row?.value ?? null;
+}
+
+/**
+ * Record the start of a refresh run and return the timestamp.
+ *
+ * "New this refresh" compares each job's first_seen_at against this value, so
+ * it must be captured BEFORE any jobs are fetched/inserted. Using the refresh
+ * start (rather than MAX(last_fetched_at), which is when the slowest source
+ * finished) ensures every job inserted during the run counts as new.
+ */
+export function markRefreshStarted(): string {
+  const row = getDb().prepare("SELECT datetime('now') AS ts").get() as {
+    ts: string;
+  };
+  setMeta("last_refresh_started_at", row.ts);
+  return row.ts;
+}
+
+/** Timestamp when the most recent refresh run began (cutoff for "new"). */
+export function lastRefreshStartedAt(): string | null {
+  return getMeta("last_refresh_started_at");
 }

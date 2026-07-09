@@ -30,6 +30,7 @@ interface JobsResponse {
   jobs: JobRow[];
   sources: SourceRow[];
   lastRefreshedAt: string | null;
+  refreshStartedAt: string | null;
   count: number;
 }
 
@@ -56,7 +57,8 @@ export default function DashboardPage() {
       if (location.trim()) params.set("location", location.trim());
       if (selectedSources.length) params.set("sourceIds", selectedSources.join(","));
       if (postedFrom) params.set("postedFrom", postedFrom);
-      if (newOnly && data?.lastRefreshedAt) params.set("newSince", data.lastRefreshedAt);
+      if (newOnly && data?.refreshStartedAt)
+        params.set("newSince", data.refreshStartedAt);
       const res = await fetch(`/api/jobs?${params.toString()}`);
       if (!res.ok) throw new Error(`Failed to load jobs (${res.status})`);
       const json = (await res.json()) as JobsResponse;
@@ -111,6 +113,9 @@ export default function DashboardPage() {
 
   const hasSources = (data?.sources.length ?? 0) > 0;
   const lastRefreshedAt = data?.lastRefreshedAt ?? null;
+  // Cutoff for "new" is when the last refresh run STARTED, so jobs inserted by
+  // every source during the run qualify (not just the slowest to finish).
+  const newSince = data?.refreshStartedAt ?? null;
 
   const filtersActive = useMemo(
     () =>
@@ -180,7 +185,7 @@ export default function DashboardPage() {
           <JobTable
             jobs={data?.jobs ?? []}
             loading={loading}
-            lastRefreshedAt={lastRefreshedAt}
+            newSince={newSince}
           />
         </>
       )}
@@ -324,11 +329,11 @@ function formatLocations(
 function JobTable({
   jobs,
   loading,
-  lastRefreshedAt,
+  newSince,
 }: {
   jobs: JobRow[];
   loading: boolean;
-  lastRefreshedAt: string | null;
+  newSince: string | null;
 }) {
   if (loading && jobs.length === 0) {
     return (
@@ -346,7 +351,7 @@ function JobTable({
   }
 
   const isNew = (j: JobRow) =>
-    lastRefreshedAt != null && j.first_seen_at >= lastRefreshedAt;
+    newSince != null && j.first_seen_at >= newSince;
 
   return (
     <div className="overflow-hidden rounded-xl border border-border">

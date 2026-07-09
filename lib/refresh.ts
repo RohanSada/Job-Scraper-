@@ -2,6 +2,7 @@ import { fetchJobsFor } from "./ats";
 import {
   getSource,
   listSources,
+  markRefreshStarted,
   updateSourceStatus,
   upsertJobs,
   type NewSource,
@@ -52,6 +53,9 @@ export async function refreshSource(source: Source): Promise<SourceRefreshResult
 
 export async function refreshAll(): Promise<SourceRefreshResult[]> {
   const sources = listSources();
+  // Capture the start BEFORE fetching so every job inserted during this run
+  // counts as "new this refresh" (see markRefreshStarted).
+  markRefreshStarted();
   // Run sequentially-ish but with limited concurrency to be polite to sites.
   return runWithConcurrency(sources, 4, refreshSource);
 }

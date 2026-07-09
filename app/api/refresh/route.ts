@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { lastRefreshedAt } from "@/lib/db";
+import { lastRefreshedAt, lastRefreshStartedAt } from "@/lib/db";
 import { refreshAll } from "@/lib/refresh";
 
 export const dynamic = "force-dynamic";
@@ -19,5 +19,6 @@ export async function POST() {
     summary,
     results,
     lastRefreshedAt: lastRefreshedAt(),
+    refreshStartedAt: lastRefreshStartedAt(),
   });
 }
